@@ -13,7 +13,20 @@ namespace project.Infra.Db
         }
 
         public DbSet<Admin> Admins { get; set; } = default!;
-        
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<Admin>().HasData(
+                new Admin
+                {
+                    Id = - -1,
+                    Email = "admin@test.com",
+                    Password = "123@123",
+                    Profile = "ADM"
+                }
+                );
+        }
+
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             if (!optionsBuilder.IsConfigured)
