@@ -1,7 +1,13 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using project.Domain.DTOs;
+using project.Domain.Interfaces;
+using project.Domain.Services;
 using project.Infra.Db;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddScoped<IAdmin, AdminServices>();
 
 builder.Services.AddDbContext<DataContext>(options =>
 {
@@ -24,18 +30,12 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapPost("/login", (LoginDTO loginDTO) =>
+app.MapPost("/login", ([FromBody]LoginDTO loginDTO, IAdmin admin) =>
 {
-    if (loginDTO.Email == "adm@test.com" && loginDTO.Password == "123@123")
-        return Results.Ok("Login correto");
+    if (admin.Login(loginDTO) != null)
+        return Results.Ok("Authorized");
     else
         return Results.Unauthorized();
 });
 
 app.Run();
-
-public class LoginDTO
-{
-    public string Email { get; set; } = default;
-    public string Password { get; set; } = default;
-}
