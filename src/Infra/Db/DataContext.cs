@@ -13,6 +13,7 @@ namespace project.Infra.Db
         }
 
         public DbSet<Admin> Admins { get; set; } = default!;
+        public DbSet<Vehicle> Vehicles { get; set; } = default!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

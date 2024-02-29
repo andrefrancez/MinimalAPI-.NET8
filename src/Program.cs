@@ -8,6 +8,7 @@ using project.Infra.Db;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddScoped<IAdmin, AdminServices>();
+builder.Services.AddScoped<IVehicle, VehicleServices>();
 
 builder.Services.AddDbContext<DataContext>(options =>
 {

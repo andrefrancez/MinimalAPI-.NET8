@@ -13,9 +13,11 @@ namespace project.Domain.Entities
         [StringLength(250)]
         public string Email { get; set; }
 
+        [Required]
         [StringLength(50)]
         public string Password { get; set; }
 
+        [Required]
         [StringLength(10)]
         public string Profile { get; set; }
     }
