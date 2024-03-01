@@ -24,7 +24,7 @@ namespace project.Domain.Services
             return _context.Vehicles.Where(v => v.Id == id).FirstOrDefault();
         }
 
-        public List<Vehicle> GetVehicles(int page = 1, string? name = null, string? make = null)
+        public List<Vehicle> GetVehicles(int? page = 1, string? name = null, string? make = null)
         {
             IQueryable<Vehicle> query = _context.Vehicles;
 
@@ -39,7 +39,8 @@ namespace project.Domain.Services
             }
 
             int pageSize = 10;
-            int skip = (page - 1) * pageSize;
+            int pageNumber = page ?? 1; 
+            int skip = (pageNumber - 1) * pageSize;
             query = query.Skip(skip).Take(pageSize);
 
             List<Vehicle> vehicles = query.ToList();

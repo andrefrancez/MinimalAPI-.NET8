@@ -4,7 +4,7 @@ namespace project.Domain.Interfaces
 {
     public interface IVehicle
     {
-        List<Vehicle> GetVehicles(int page = 1, string? name = null, string? make = null);
+        List<Vehicle> GetVehicles(int? page = 1, string? name = null, string? make = null);
 
         Vehicle GetVehicle(int id);
 
