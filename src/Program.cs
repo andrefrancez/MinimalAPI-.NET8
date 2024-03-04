@@ -6,6 +6,7 @@ using project.Domain.Interfaces;
 using project.Domain.ModelViews;
 using project.Domain.Services;
 using project.Infra.Db;
+using System.Threading.Tasks.Dataflow;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,8 +46,34 @@ app.MapPost("/login", ([FromBody]LoginDTO loginDTO, IAdmin admin) =>
 
 // Vehicle
 
+ValidationError validationDTO(VehicleDTO vehicleDTO)
+{
+    var messagesValidation = new ValidationError
+    {
+        Messages = new List<string>()
+    };
+
+    if (string.IsNullOrEmpty(vehicleDTO.Name))
+        messagesValidation.Messages.Add("The name cannot be null!");
+
+    if (string.IsNullOrEmpty(vehicleDTO.Make))
+        messagesValidation.Messages.Add("The make cannot be null!");
+
+    if (vehicleDTO.ModelYear < 1900)
+        messagesValidation.Messages.Add("The vehicle's model year needs to be above 1900");
+
+    if (string.IsNullOrEmpty(vehicleDTO.Color))
+        messagesValidation.Messages.Add("The color cannot be null!");
+
+    return messagesValidation;
+}
+
 app.MapPost("/vehicles", ([FromBody] VehicleDTO vehicleDTO, IVehicle vehicle) =>
 {
+    var messages = validationDTO(vehicleDTO);
+    if (messages.Messages.Count > 0)
+        return Results.BadRequest(messages);
+
     var vehicleData = new Vehicle
     {
         Name = vehicleDTO.Name,
@@ -83,6 +110,10 @@ app.MapPut("/vehicles/{id}", ([FromRoute]int id, VehicleDTO vehicleDTO, IVehicle
     var vehicleInfo = vehicle.GetVehicle(id);
     if (vehicleInfo == null)
         return Results.NotFound();
+
+    var messages = validationDTO(vehicleDTO);
+    if (messages.Messages.Count > 0)
+        return Results.BadRequest(messages);
 
     vehicleInfo.Name = vehicleDTO.Name;
     vehicleInfo.Make = vehicleDTO.Make;

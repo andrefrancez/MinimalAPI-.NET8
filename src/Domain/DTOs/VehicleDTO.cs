@@ -8,7 +8,7 @@ namespace project.Domain.DTOs
 
         public string Make { get; set; }
 
-        public string ModelYear { get; set; }
+        public int ModelYear { get; set; }
 
         public string Color { get; set; }
 

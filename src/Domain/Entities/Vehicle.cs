@@ -18,7 +18,7 @@ namespace project.Domain.Entities
         public string Make { get; set; }
 
         [Required]
-        public string ModelYear { get; set; }
+        public int ModelYear { get; set; }
 
         [Required]
         [StringLength(70)]
