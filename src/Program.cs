@@ -2,10 +2,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using project.Domain.DTOs;
 using project.Domain.Entities;
+using project.Domain.Enums;
 using project.Domain.Interfaces;
 using project.Domain.ModelViews;
 using project.Domain.Services;
 using project.Infra.Db;
+using System.Runtime.Intrinsics.Arm;
 using System.Threading.Tasks.Dataflow;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -36,7 +38,8 @@ app.UseHttpsRedirection();
 
 app.MapGet("/", () => Results.Json(new Home())).WithTags("Home");
 
-app.MapPost("/login", ([FromBody]LoginDTO loginDTO, IAdmin admin) =>
+#region Adm
+app.MapPost("/admins/login", ([FromBody]LoginDTO loginDTO, IAdmin admin) =>
 {
     if (admin.Login(loginDTO) != null)
         return Results.Ok("Authorized");
@@ -44,8 +47,75 @@ app.MapPost("/login", ([FromBody]LoginDTO loginDTO, IAdmin admin) =>
         return Results.Unauthorized();
 }).WithTags("Adm");
 
-// Vehicle
+app.MapPost("/admins", ([FromBody] AdminDTO adminDTO, IAdmin admin) =>
+{
+    var messages = new ValidationError
+    {
+        Messages = new List<string>()
+    };
 
+    if (string.IsNullOrEmpty(adminDTO.Email))
+        messages.Messages.Add("The make cannot be null!");
+
+    if (string.IsNullOrEmpty(adminDTO.Password))
+        messages.Messages.Add("The make cannot be null!");
+
+    if (adminDTO.Profile == null)
+        messages.Messages.Add("The make cannot be null!");
+
+    if (messages.Messages.Count > 0)
+        return Results.BadRequest(messages);
+
+    var adm = new Admin
+    {
+        Email = adminDTO.Email,
+        Password = adminDTO.Password,
+        Profile = adminDTO.Profile.ToString() ?? Profile.Editor.ToString(),
+    };
+
+    admin.PostAdmin(adm);
+
+    return Results.Created($"/admins/{adm.Id}", new AdminModelViews
+    {
+        Id = adm.Id,
+        Email = adm.Email,
+        Profile = adm.Profile,
+    });
+}).WithTags("Adm");
+
+app.MapGet("/admins", ([FromQuery] int? page, IAdmin admin) =>
+{
+    var adms = new List<AdminModelViews>();
+    var admins = admin.GetAdmins(page);
+
+    foreach(var adm in admins)
+    {
+        adms.Add(new AdminModelViews
+        {
+            Id = adm.Id,
+            Email = adm.Email,
+            Profile = adm.Profile,
+        });
+    }
+    return Results.Ok(adms);
+}).WithTags("Adm");
+
+app.MapGet("/admins/{id}", ([FromQuery]int id, IAdmin admin) => {
+    var adminInfo = admin.GetAdmin(id);
+
+    if (adminInfo == null)
+        return Results.NotFound();
+
+    return Results.Ok(new AdminModelViews
+    {
+        Id = adminInfo.Id,
+        Email = adminInfo.Email,
+        Profile = adminInfo.Profile,
+    });
+}).WithTags("Adm");
+#endregion
+
+#region Vehicles
 ValidationError validationDTO(VehicleDTO vehicleDTO)
 {
     var messagesValidation = new ValidationError
@@ -137,5 +207,6 @@ app.MapDelete("/vehicles/{id}", ([FromRoute]int id, IVehicle vehicle) =>
 
     return Results.NoContent();
 }).WithTags("Vehicles");
+#endregion
 
 app.Run();
