@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using project.Domain.DTOs;
 using project.Domain.Entities;
 using project.Domain.Enums;
@@ -7,10 +9,33 @@ using project.Domain.Interfaces;
 using project.Domain.ModelViews;
 using project.Domain.Services;
 using project.Infra.Db;
+using System.ComponentModel.DataAnnotations;
+using System.IdentityModel.Tokens.Jwt;
 using System.Runtime.Intrinsics.Arm;
+using System.Security.Claims;
+using System.Text;
 using System.Threading.Tasks.Dataflow;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddAuthentication(option =>
+{
+    option.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    option.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateActor = true,
+        ValidateLifetime = true,
+        ValidateAudience = true,
+        ValidateIssuerSigningKey = true,
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+    };
+});
+
+builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<IAdmin, AdminServices>();
 builder.Services.AddScoped<IVehicle, VehicleServices>();
@@ -39,12 +64,43 @@ app.UseHttpsRedirection();
 app.MapGet("/", () => Results.Json(new Home())).WithTags("Home");
 
 #region Adm
-app.MapPost("/admins/login", ([FromBody]LoginDTO loginDTO, IAdmin admin) =>
+string GetTokenJwt(Admin admin)
 {
-    if (admin.Login(loginDTO) != null)
-        return Results.Ok("Authorized");
+    var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]));
+    var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+    var claims = new List<Claim>()
+    {
+        new Claim("Email", admin.Email),
+        new Claim("Profile", admin.Profile)
+    };
+
+    var token = new JwtSecurityToken(
+        claims: claims,
+        expires: DateTime.Now.AddMinutes(5),
+        signingCredentials: credentials
+        );
+
+    return new JwtSecurityTokenHandler().WriteToken(token);
+}
+
+app.MapPost("/admins/login", ([FromBody] LoginDTO loginDTO, IAdmin admin) =>
+{
+    var adm = admin.Login(loginDTO);
+    if (adm != null)
+    {
+        string token = GetTokenJwt(adm);
+        return Results.Ok(new AuthorizedAdmin
+        {
+            Email = adm.Email,
+            Profile = adm.Profile,
+            Token = token
+        });
+    }
     else
+    {
         return Results.Unauthorized();
+    }
 }).WithTags("Adm");
 
 app.MapPost("/admins", ([FromBody] AdminDTO adminDTO, IAdmin admin) =>
@@ -81,14 +137,14 @@ app.MapPost("/admins", ([FromBody] AdminDTO adminDTO, IAdmin admin) =>
         Email = adm.Email,
         Profile = adm.Profile,
     });
-}).WithTags("Adm");
+}).RequireAuthorization().WithTags("Adm");
 
 app.MapGet("/admins", ([FromQuery] int? page, IAdmin admin) =>
 {
     var adms = new List<AdminModelViews>();
     var admins = admin.GetAdmins(page);
 
-    foreach(var adm in admins)
+    foreach (var adm in admins)
     {
         adms.Add(new AdminModelViews
         {
@@ -98,9 +154,10 @@ app.MapGet("/admins", ([FromQuery] int? page, IAdmin admin) =>
         });
     }
     return Results.Ok(adms);
-}).WithTags("Adm");
+}).RequireAuthorization().WithTags("Adm");
 
-app.MapGet("/admins/{id}", ([FromQuery]int id, IAdmin admin) => {
+app.MapGet("/admins/{id}", ([FromQuery] int id, IAdmin admin) =>
+{
     var adminInfo = admin.GetAdmin(id);
 
     if (adminInfo == null)
@@ -112,7 +169,7 @@ app.MapGet("/admins/{id}", ([FromQuery]int id, IAdmin admin) => {
         Email = adminInfo.Email,
         Profile = adminInfo.Profile,
     });
-}).WithTags("Adm");
+}).RequireAuthorization().WithTags("Adm");
 #endregion
 
 #region Vehicles
@@ -156,16 +213,16 @@ app.MapPost("/vehicles", ([FromBody] VehicleDTO vehicleDTO, IVehicle vehicle) =>
     vehicle.PostVehicle(vehicleData);
 
     return Results.Created($"/vehicles/{vehicleData.Id}", vehicleData);
-}).WithTags("Vehicles");
+}).RequireAuthorization().WithTags("Vehicles");
 
-app.MapGet("/vehicles", ([FromQuery]int? page, IVehicle vehicle) =>
+app.MapGet("/vehicles", ([FromQuery] int? page, IVehicle vehicle) =>
 {
     var vehicles = vehicle.GetVehicles(page);
 
     return Results.Ok(vehicles);
-}).WithTags("Vehicles");
+}).RequireAuthorization().WithTags("Vehicles");
 
-app.MapGet("/vehicle/{id}", ([FromRoute]int id, IVehicle vehicle) =>
+app.MapGet("/vehicle/{id}", ([FromRoute] int id, IVehicle vehicle) =>
 {
     var vehicleInfo = vehicle.GetVehicle(id);
 
@@ -173,9 +230,9 @@ app.MapGet("/vehicle/{id}", ([FromRoute]int id, IVehicle vehicle) =>
         return Results.NotFound();
 
     return Results.Ok(vehicleInfo);
-}).WithTags("Vehicles");
+}).RequireAuthorization().WithTags("Vehicles");
 
-app.MapPut("/vehicles/{id}", ([FromRoute]int id, VehicleDTO vehicleDTO, IVehicle vehicle) =>
+app.MapPut("/vehicles/{id}", ([FromRoute] int id, VehicleDTO vehicleDTO, IVehicle vehicle) =>
 {
     var vehicleInfo = vehicle.GetVehicle(id);
     if (vehicleInfo == null)
@@ -194,9 +251,9 @@ app.MapPut("/vehicles/{id}", ([FromRoute]int id, VehicleDTO vehicleDTO, IVehicle
     vehicle.UpdateVehicle(vehicleInfo);
 
     return Results.Ok(vehicleInfo);
-}).WithTags("Vehicles");
+}).RequireAuthorization().WithTags("Vehicles");
 
-app.MapDelete("/vehicles/{id}", ([FromRoute]int id, IVehicle vehicle) =>
+app.MapDelete("/vehicles/{id}", ([FromRoute] int id, IVehicle vehicle) =>
 {
     var vehicleInfo = vehicle.GetVehicle(id);
 
@@ -206,7 +263,10 @@ app.MapDelete("/vehicles/{id}", ([FromRoute]int id, IVehicle vehicle) =>
     vehicle.DeleteVehicle(vehicleInfo);
 
     return Results.NoContent();
-}).WithTags("Vehicles");
+}).RequireAuthorization().WithTags("Vehicles");
 #endregion
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.Run();

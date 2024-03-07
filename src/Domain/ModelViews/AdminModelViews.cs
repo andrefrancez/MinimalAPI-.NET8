@@ -2,7 +2,7 @@
 
 namespace project.Domain.ModelViews
 {
-    public class AdminModelViews
+    public record AdminModelViews
     {
         public int Id { get; set; }
         public string Email { get; set; }
